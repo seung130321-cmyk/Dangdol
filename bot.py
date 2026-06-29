@@ -216,7 +216,7 @@ async def cmd_help(interaction: discord.Interaction):
         ),
         color=discord.Color.blurple(),
     )
-    await interaction.followup.send(embed=embed)
+    await send_with_banner(interaction, BANNER_AI, embed)
 
 
 # ═══════════════════════════════════════════════════════
@@ -261,9 +261,6 @@ async def cmd_points(interaction: discord.Interaction):
 # ═══════════════════════════════════════════════════════
 #  슬래시 커맨드: /구매
 # ═══════════════════════════════════════════════════════
-
-class ShopItem(app_commands.Choice, str):
-    pass
 
 @tree.command(name="구매", description="포인트로 상품을 구매해요!")
 @app_commands.describe(상품="구매할 상품을 선택하세요")
