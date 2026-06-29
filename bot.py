@@ -22,6 +22,7 @@ MEMBER_ROLE_NAME    = os.environ.get("MEMBER_ROLE_NAME", "당돌한 맴버")   #
 BANNER_LEVELUP      = os.environ.get("BANNER_LEVELUP",  "banners/levelup.png")
 BANNER_AI           = os.environ.get("BANNER_AI",       "banners/ai.png")
 BANNER_SHOP         = os.environ.get("BANNER_SHOP",     "banners/shop.png")
+BANNER_WELCOME      = os.environ.get("BANNER_WELCOME",  "banners/welcome.png")
 COMMISSION_PRICE    = int(os.environ.get("COMMISSION_PRICE", "200"))
 ROLE_PRICE          = int(os.environ.get("ROLE_PRICE",        "100"))
 
@@ -140,11 +141,19 @@ async def on_member_join(member: discord.Member):
         None,
     )
     if channel:
-        await channel.send(
-            f"안녕하세요! {member.mention}님, 저는 이 서버의 가이드예요. "
-            f"도움이 필요하시면 `/도움말`을 입력해 주세요! "
-            f"아 참, `인증됨` 역할도 지급해 드렸답니다! 🎉"
+        embed = discord.Embed(
+            description=(
+                f"안녕하세요! {member.mention}님, 저는 이 서버의 가이드예요.\n"
+                f"도움이 필요하시면 `/도움말`을 입력해 주세요!\n"
+                f"아 참, `인증됨` 역할도 지급해 드렸답니다! 🎉"
+            ),
+            color=discord.Color.green(),
         )
+        embed.set_author(
+            name=member.display_name,
+            icon_url=member.display_avatar.url,
+        )
+        await send_with_banner(channel, BANNER_WELCOME, embed)
 
 
 # ═══════════════════════════════════════════════════════
