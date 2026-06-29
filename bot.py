@@ -31,7 +31,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ── Gemini ────────────────────────────────────────────
 genai.configure(api_key=GEMINI_API_KEY)
-gemini_model = genai.GenerativeModel("gemini-1.5-flash")
+gemini_model = genai.GenerativeModel("gemini-3.5-flash")
 
 # ── Discord ───────────────────────────────────────────
 intents = discord.Intents.default()
