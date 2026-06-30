@@ -55,12 +55,25 @@ def make_hash(user_id: int) -> str:
 def level_from_messages(messages: int) -> int:
     """
     누적 메시지 수로 레벨 계산.
-    레벨 n이 되려면 sum_{k=1}^{n} (k^2 - k) 개의 포인트가 필요.
-    단순하게: level = floor(sqrt(messages)) + 1 (최소 1)
+    - 1~15레벨: level = floor(sqrt(messages))  (기존과 동일하게 부드러움)
+    - 16레벨 이상: 4제곱 기반으로 훨씬 가파르게 증가
     """
     if messages <= 0:
         return 1
-    return max(1, math.isqrt(messages))
+
+    LEVEL_15_MESSAGES = 15 * 15  # 225 (기존 공식으로 15레벨 도달 시점)
+
+    if messages < LEVEL_15_MESSAGES:
+        return max(1, math.isqrt(messages))
+
+    # 15레벨 이후: 한 레벨 올리는데 필요한 메시지 수가 4제곱 형태로 증가
+    # (20레벨 도달 시점이 약 50,000 메시지가 되도록 계수 조정)
+    LEVELUP_SCALE = 80
+    extra = messages - LEVEL_15_MESSAGES + 1
+    bonus_level = 0
+    while LEVELUP_SCALE * (bonus_level + 1) ** 4 <= extra:
+        bonus_level += 1
+    return 15 + bonus_level
 
 
 def points_for_levelup(current_level: int) -> int:
