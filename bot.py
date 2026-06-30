@@ -23,6 +23,7 @@ BANNER_LEVELUP      = os.environ.get("BANNER_LEVELUP",  "banners/levelup.png")
 BANNER_AI           = os.environ.get("BANNER_AI",       "banners/ai.png")
 BANNER_SHOP         = os.environ.get("BANNER_SHOP",     "banners/shop.png")
 BANNER_WELCOME      = os.environ.get("BANNER_WELCOME",  "banners/welcome.png")
+BANNER_VERIFY       = os.environ.get("BANNER_VERIFY",   "banners/welcome.png")
 COMMISSION_PRICE    = int(os.environ.get("COMMISSION_PRICE", "200"))
 ROLE_PRICE          = int(os.environ.get("ROLE_PRICE",        "100"))
 
@@ -31,7 +32,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ── Gemini ────────────────────────────────────────────
 genai.configure(api_key=GEMINI_API_KEY)
-gemini_model = genai.GenerativeModel("gemini-3.5-flash")
+gemini_model = genai.GenerativeModel("gemini-1.5-flash")
 
 # ── Discord ───────────────────────────────────────────
 intents = discord.Intents.default()
@@ -119,6 +120,35 @@ async def send_with_banner(
 
 
 # ═══════════════════════════════════════════════════════
+#  인증 버튼 View
+# ═══════════════════════════════════════════════════════
+
+class VerifyView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="인증 받기", style=discord.ButtonStyle.success, custom_id="verify_button", emoji="✅")
+    async def verify_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        role = discord.utils.get(interaction.guild.roles, name=VERIFIED_ROLE_NAME)
+        if not role:
+            try:
+                role = await interaction.guild.create_role(name=VERIFIED_ROLE_NAME, reason="인증 시스템 자동 생성")
+            except discord.Forbidden:
+                await interaction.response.send_message("❌ 역할을 생성할 권한이 없어요.", ephemeral=True)
+                return
+
+        if role in interaction.user.roles:
+            await interaction.response.defer()
+            return
+
+        try:
+            await interaction.user.add_roles(role, reason="셀프 인증")
+            await interaction.response.defer()
+        except discord.Forbidden:
+            await interaction.response.send_message("❌ 역할을 부여할 권한이 없어요.", ephemeral=True)
+
+
+# ═══════════════════════════════════════════════════════
 #  이벤트: 신규 멤버
 # ═══════════════════════════════════════════════════════
 
@@ -126,14 +156,6 @@ async def send_with_banner(
 async def on_member_join(member: discord.Member):
     # DB 초기화
     await get_or_create_user(member.id, str(member))
-
-    # 인증됨 역할 지급
-    verified_role = discord.utils.get(member.guild.roles, name=VERIFIED_ROLE_NAME)
-    if verified_role:
-        try:
-            await member.add_roles(verified_role, reason="신규 멤버 자동 인증")
-        except discord.Forbidden:
-            pass
 
     # 첫 번째 텍스트 채널에 환영 메시지
     channel = member.guild.system_channel or next(
@@ -145,7 +167,7 @@ async def on_member_join(member: discord.Member):
             description=(
                 f"안녕하세요! {member.mention}님, 저는 이 서버의 가이드예요.\n"
                 f"도움이 필요하시면 `/도움말`을 입력해 주세요!\n"
-                f"아 참, `인증됨` 역할도 지급해 드렸답니다! 🎉"
+                f"아 참, `인증됨` 역할은 #📜┋verify 에서 발급해요! 🎉"
             ),
             color=discord.Color.green(),
         )
@@ -249,9 +271,9 @@ async def cmd_points(interaction: discord.Interaction):
         name="🛒 구매 가능 상품",
         value=(
             f"🎨 **커미션** — {COMMISSION_PRICE} 포인트\n"
-            f"   `/구매 커미션` 으로 구매!\n\n"
+            f"   `/구매 커미션`으로 구매해요!\n\n"
             f"🏷️ **서버 칭호** (당돌한 맴버 역할) — {ROLE_PRICE} 포인트\n"
-            f"   `/구매 칭호` 으로 구매!"
+            f"   `/구매 칭호`로 구매해요!"
         ),
         inline=False,
     )
@@ -296,7 +318,7 @@ async def cmd_buy(interaction: discord.Interaction, 상품: str):
                 return
         try:
             await interaction.user.add_roles(role, reason="포인트 상점 구매")
-            result_msg = f"✅ **당돌한 맴버** 역할이 지급되었어요!"
+            result_msg = "✅ **당돌한 맴버** 역할이 지급됐어요!"
         except discord.Forbidden:
             await interaction.followup.send("❌ 역할을 부여할 권한이 없어요.", ephemeral=True)
             return
@@ -334,6 +356,42 @@ async def cmd_ask(interaction: discord.Interaction, 내용: str):
 
 
 # ═══════════════════════════════════════════════════════
+#  슬래시 커맨드: /set (인증 패널)
+# ═══════════════════════════════════════════════════════
+
+@tree.command(name="set", description="인증 패널을 이 채널에 설치해요!")
+@app_commands.checks.has_permissions(administrator=True)
+async def cmd_set(interaction: discord.Interaction):
+    await interaction.response.defer()
+    embed = discord.Embed(
+        description=(
+            "### 인증하기\n"
+            "⚠️ 주의사항이에요\n\n"
+            "`1. 인증하시면 봇이 사용자의 데이터를 수집해요.`\n"
+            "`2. 인증하시면 Luma 서버의 규칙을 준수하는 것으로 간주돼요.`\n"
+            "`3. 사용자는 테러, 서버 불법 이용, 무단 에셋 배포를 금할 것을 맹세해요.`"
+        ),
+        color=discord.Color.blue(),
+    )
+    f = banner_file(BANNER_VERIFY)
+    if f:
+        fname = os.path.basename(BANNER_VERIFY)
+        embed.set_image(url=f"attachment://{fname}")
+        await interaction.followup.send(file=f, embed=embed, view=VerifyView())
+    else:
+        await interaction.followup.send(embed=embed, view=VerifyView())
+
+
+@cmd_set.error
+async def cmd_set_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    if isinstance(error, app_commands.MissingPermissions):
+        if interaction.response.is_done():
+            return
+        await interaction.response.defer()
+        return
+
+
+# ═══════════════════════════════════════════════════════
 #  prefix 커맨드: py 명령어
 # ═══════════════════════════════════════════════════════
 
@@ -346,6 +404,7 @@ async def prefix_help(ctx: commands.Context):
             "> `/포인트` — 보유 포인트와 상품 확인이 가능해요!\n"
             "> `/질문하기 내용` — AI가 답변을 해줘요!\n"
             "> `/구매 상품` — 포인트로 상품을 구매해요!\n"
+            "> `/set` — 인증 패널 설치 (관리자 전용)\n"
             "\n"
             "> `py 명령어` — 이 목록을 표시해요 (prefix 방식)"
         ),
@@ -360,6 +419,7 @@ async def prefix_help(ctx: commands.Context):
 
 @bot.event
 async def on_ready():
+    bot.add_view(VerifyView())
     await tree.sync()
     print(f"✅ 봇 준비 완료: {bot.user} (ID: {bot.user.id})")
 
